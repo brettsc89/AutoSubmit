@@ -1,0 +1,40 @@
+#!/bin/bash
+
+
+
+error_exit()
+{
+    echo "$1" 1>&2
+    exit 1
+}
+
+cd prior_runs || error_exit "could not find the prior runs directory"
+
+sed -e 's/poly.restart./Jx/g' restart_list.txt > Jxlist.txt
+sed -e 's/poly.restart./Jy/g' restart_list.txt > Jylist.txt
+sed -e 's/poly.restart./Jz/g' restart_list.txt > Jzlist.txt
+
+sed -i 's/$/.txt/g'  Jxlist.txt
+sed -i 's/$/.txt/g'  Jylist.txt
+sed -i 's/$/.txt/g'  Jzlist.txt
+
+cp ../xcorr.cpp .
+
+module load fftw/3.3.7_gcc-5.4.0
+module load gcc/5.4.0   
+
+g++ xcorr.cpp -lfftw3 -o cor -std=c++11
+
+echo "calculating x direction ACF"
+./cor Jxlist.txt ACFx.txt 10000 
+echo "calculating y direction ACF"
+./cor Jylist.txt ACFy.txt 10000 
+echo "calculating z direction ACF"
+./cor Jzlist.txt ACFz.txt 10000 
+
+rm cor xcorr.cpp 
+
+cd ..
+
+mv prior_runs/ACF* . 
+
