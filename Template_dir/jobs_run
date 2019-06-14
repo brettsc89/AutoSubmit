@@ -1,0 +1,13 @@
+#!/bin/bash
+
+
+hold_jid=$(qsub -terse run.job)
+echo ${hold_jid}
+
+hold_jid=$(qsub -terse -hold_jid $hold_jid run.job)
+echo ${hold_jid}
+
+
+
+ 
+

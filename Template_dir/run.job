@@ -1,0 +1,101 @@
+#!/bin/bash
+#$ -S /bin/bash
+#$ -pe 56cpn 224
+#$ -q all.q
+
+# Make sure that the .e and .o file arrive in the working directory
+#$ -V
+#$ -cwd
+
+
+
+#function for error handling
+error_exit()
+{
+    echo "$1" 1>&2
+    exit 1
+}
+
+
+#check for completed equilibration run
+if [ ! -f equilib/complete.txt ]; then
+
+    echo "equilibration run has not yet been successfully completed"
+
+    
+    cd equilib
+
+    #start lammps run
+    mpirun -np 224 ~/lammps-12Dec18/build/lmp -in in.ultracold_ocp_nano
+
+    echo "completed equilibration" > complete.txt
+
+    cd ..
+fi
+
+
+
+if [ ! -f firstrun.txt ]; then
+
+    echo "first run has not yet been successfully completed"
+
+    #create first run directory
+    cp template run -r || error_exit "could not find template directory"
+
+    # remove dirlist from unsucessful first run if it exists
+    rm dirlist.txt 
+
+    #add this directory to the directory list 
+    ls run -d -tr > dirlist.txt
+
+    #move to run directory
+    cd run 
+
+    #start lammps run
+    mpirun -np 224 ~/lammps-12Dec18/build/lmp -in in.ultracold_ocp_nano_run
+
+    #create restart list for current directory
+    touch restart_list.txt
+    #add restarts from first run to list
+    ls pol* -tr >restart_list.txt
+
+    #cd to base directory and create directory for run2
+    cd ../
+
+    echo "first run complete" > firstrun.txt
+
+fi
+
+./resubmit_cleanup
+
+
+runnumber=0
+until [ "$runnumber" -ge 30 ]; do
+
+    runnumber=$((runnumber + 1))
+
+    rundir="run${runnumber}"
+
+
+    cp template ${rundir} -r
+
+    #move to run 2 directory
+    cd ${rundir}
+    #setup input deck to restart from first run
+    ./setup_restart || error_exit "setup of input deck failed"
+
+    cd ..
+    ls run* -d -tr > dirlist.txt
+    cd ${rundir}
+
+    mpirun -np 224 ~/lammps-12Dec18/build/lmp -in in.ultracold_ocp_nano_run
+
+    touch restart_list.txt
+
+    ls pol* -tr >restart_list.txt
+
+    cd ..
+
+    
+done
+

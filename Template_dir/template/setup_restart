@@ -1,0 +1,41 @@
+#!/bin/bash
+
+#function for error handling
+error_exit()
+{
+    echo "$1" 1>&2
+    exit 1
+}
+
+
+#default restart directory
+OLDDIR="equilib"
+
+#find newest run directory
+NEWDIR=$(tail -1 ../dirlist.txt) || error_exit "could not find run directory list" 
+
+echo "The default restart directory is ${OLDDIR}"
+echo "Setting the restart directory to ${NEWDIR}"
+
+OLDRESTART=poly.restart.500000
+NEWRESTART=$(tail -1 ../${NEWDIR}/restart_list.txt) || error_exit "could not find restart list"
+
+
+echo "Setting the original restart file ${OLDRESTART} to its new value: ${NEWRESTART}"   
+
+#replace in input deck
+sed -i -e "s/${OLDDIR}/${NEWDIR}/g" -e "s/${OLDRESTART}/${NEWRESTART}/g" in.* || error_exit "sed: error replacing text"
+
+#strip the restart time step number from the restart file
+NEWSTEP=$(echo ${NEWRESTART} | grep -Eo '[0-9]{1,9}')
+
+#Increment the timestep by 1
+NEWSTEP=$(echo ${NEWSTEP%0}1)
+
+echo "Setting the restart timestep to ${NEWSTEP}" 
+
+TSTEP_LINE="reset_timestep  0"
+TSTEP_NEWLINE="reset_timestep  ${NEWSTEP}"
+
+#Replace in input deck
+sed -i "s/${TSTEP_LINE}/${TSTEP_NEWLINE}/g" in.* || error_exit "sed: error resetting the time step number"

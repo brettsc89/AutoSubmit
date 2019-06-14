@@ -1,0 +1,68 @@
+#!/bin/bash
+
+#function for error handling 
+error_exit()
+{
+    echo "$1" 1>&2
+    exit 1
+}
+
+#find the number of run directories from the previous submission
+Nrundirs=$(echo $(wc -l dirlist.txt | awk '{print $1}'))
+
+#
+echo "The previous submission created ${Nrundirs} run directories. Cleaning these up now"
+
+
+mkdir prior_runs
+touch prior_runs/restart_list.txt
+
+runnumber=0
+until [ "$runnumber" -ge "$Nrundirs" ]; do
+    
+    runnumber=$((runnumber + 1))
+    
+    cur_rundir=$(echo $(sed "${runnumber}q;d" dirlist.txt))
+
+ 
+
+    #echo "$cur_rundir"
+    #cat ${cur_rundir}/restart_list.txt
+    
+    Ndir_restarts=$(echo $(wc -l ${cur_rundir}/restart_list.txt | awk '{print $1}'))
+    
+    #echo "$Ndir_restarts"
+
+    
+    if [ "$Ndir_restarts" = 2 ]; then
+	
+	dir_last_rest=$(echo $(sed "2q;d" ${cur_rundir}/restart_list.txt))
+	echo "The last of ${Ndir_restarts} restarts in directory ${cur_rundir} is ${dir_last_rest}"
+	dir_last_step=$(echo ${dir_last_rest}| grep -Eo '[0-9]{1,9}')
+	echo "the last time step in this run is ${dir_last_step}"
+	echo "Moving this data to the prior_runs directory"
+	
+	cp ${cur_rundir}/Jx.txt prior_runs/Jx${dir_last_step}.txt
+	cp ${cur_rundir}/Jy.txt prior_runs/Jy${dir_last_step}.txt
+	cp ${cur_rundir}/Jz.txt prior_runs/Jz${dir_last_step}.txt
+	cp ${cur_rundir}/${dir_last_rest} prior_runs/ 
+	
+	echo "adding ${dir_last_rest} to the restart list"
+	
+	echo ${dir_last_rest} >> prior_runs/restart_list.txt
+
+    else
+	echo "The run in ${cur_rundir} exited abnormally. Ignoring this data for the resubmitted run."
+	
+    fi
+
+done
+
+
+echo "Removing previous run directories"
+rm run* -r 
+echo "Removing previous run directory lists"
+rm dirlist.txt
+
+ls prior_runs -d  > dirlist.txt
+

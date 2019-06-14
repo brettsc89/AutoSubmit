@@ -1,0 +1,120 @@
+#3D box simulation
+
+#	Variable definition
+variable lnorm		equal     1e-9           # length normalization for nano units
+variable tnorm  	equal     1e-9           # time normalization for nano units
+variable mnorm  	equal     1e-21          # mass normalization for nano units
+variable enorm  	equal     1.60217662e-19 # charge normalization for nano units
+
+
+# Defining constants
+variable cs_e		equal	  1.60217662e-19   # unit charge in Coulomb
+variable cs_kB          equal     1.38064852e-23   # SI units
+variable cs_eps         equal     8.854187817e-12  # SI units
+variable cs_4piby3	equal     4.0*PI/3.0
+variable cs_cfden       equal     (1.0/${cs_4piby3})^(1/3)
+variable cs_1by4pep     equal     1.0/(4.0*PI*${cs_eps})
+variable cs_Msp         equal     9.10938356e-31 # electron mass in SI
+
+# Plasma parameters (All in physical units)
+variable Gm             equal     0.1              # Coupling strength (each species)
+variable Np             equal     20000           # No. of particles 
+variable ndens 	        equal     1e14           # /m^3   (each species)
+variable Z              equal     -1.0           # units of charge
+variable mp             equal     ${cs_Msp}      # charged species mass
+variable Q              equal     ${Z}*${cs_e}   # charge on the particle
+
+# Calculating plasma properties (based on per species)
+variable  aa            equal     ${cs_cfden}*(1.0/${ndens})^(1/3)  
+variable  T             equal     ${cs_1by4pep}*(((${Z})^2)*(${cs_e})^2)/(${aa}*${cs_kB}*${Gm})
+variable  Vc            equal     ${Np}/${ndens}
+variable  lc            equal     (${Vc})^(1/3)
+variable  pl_prd        equal     ((${cs_eps}*${mp})/(${ndens}*(${Z}*${cs_e})^2))^(1/2)
+
+print     "The coupling strength Gm                    = ${Gm}"	      file plasma_parameters.txt screen no
+print     "The density of plasma                       = ${ndens}"    append plasma_parameters.txt screen no
+print  	  "The plasma period                           = ${pl_prd}"   append plasma_parameters.txt screen no	
+print     "The temperature corresponding Gamma ${Gm}   = ${T} "       append plasma_parameters.txt screen no
+print     "The average interparticle separation a      = ${aa}"       append plasma_parameters.txt screen no
+print     "Length of the system in each direction, L   = ${lc}"       append plasma_parameters.txt screen no
+
+# Defining simulation parameters (With proper normalization)
+variable a3d		equal     ${aa}/${lnorm}      # Av. int. sep in normalized unit
+variable lu     	equal     ${a3d}              # unit cell length (same as a3d in liquid)
+variable Q1     	equal     ${Q}/${enorm}      # charge on particle
+variable lxx    	equal	  ${lc}/${lnorm}
+variable lyy    	equal	  ${lc}/${lnorm}
+variable lzz    	equal 	  ${lc}/${lnorm}
+variable ompei  	equal     ${pl_prd}/${tnorm}   # plasma characterstic frequency
+variable kscr           equal     2.0/${a3d}
+
+
+variable dt    		equal     0.001*${ompei} #timestep size
+variable nt     	equal     500000         #total runsteps
+variable trx    	equal     100*${dt}    #temp relax for nvt
+variable Nth            equal     100          	       # thermo steps
+variable nrst   	equal     100000        # restart file generation steps
+
+#creating positrons and protons with specific temperature
+variable itp         	equal     ${T}        #init temp for NVT 
+variable ftp     	equal     ${T}        #final temp for NVT 
+
+variable cutf   	equal     5.0*${lu}      #pair force cuf-off
+variable ngh    	equal     0.1*${cutf}
+
+
+
+# Masses
+variable mp1		equal     ${mp}/${mnorm}
+
+#Initialization
+
+units			nano
+atom_style		charge
+dimension		3
+boundary		p p p
+
+#Atom definition
+
+region			simbox block 0 ${lxx} 0 ${lyy} 0 ${lzz}
+create_box      	1 simbox
+create_atoms		1 random ${Np} 343235 NULL
+
+# assume type 1 is positive
+set			group all charge ${Q1}
+
+# Force field
+pair_style		coul/long ${cutf}
+#pair_style		coul/debye ${kscr} ${cutf} #switch to OCP was: coul/long ${cutf} 
+pair_coeff		* *
+
+
+kspace_style    	pppm 1e-6
+kspace_modify           mesh 50 50 50 
+pair_modify     	table 0
+
+#Settings
+neighbor		${ngh} bin
+neigh_modify		every 1 delay 0  check yes one 10000 page 160000
+
+mass 1 			${mp1}
+
+# temperature controller
+
+compute			new3d all temp
+
+# equilibrate
+velocity		all create ${itp} 5812775 temp new3d units box
+fix			eq1 all nvt temp ${itp} ${ftp} ${trx}
+
+
+thermo			${Nth}
+timestep		${dt}
+
+# potential calculation
+
+thermo_modify		temp new3d
+restart         	${nrst}   poly.restart
+run			${nt}
+
+
