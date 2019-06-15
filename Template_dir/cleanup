@@ -1,16 +1,18 @@
 #!/bin/bash
 
 
-
 error_exit()
 {
     echo "$1" 1>&2
     exit 1
 }
 
+
+./resubmit_cleanup || error_exit "final cleanup failed"
+
 cd prior_runs || error_exit "could not find the prior runs directory"
 
-sed -e 's/poly.restart./Jx/g' restart_list.txt > Jxlist.txt
+sed -e 's/poly.restart./Jx/g' restart_list.txt > Jxlist.txt || error_exit "J list failed"
 sed -e 's/poly.restart./Jy/g' restart_list.txt > Jylist.txt
 sed -e 's/poly.restart./Jz/g' restart_list.txt > Jzlist.txt
 
@@ -18,19 +20,19 @@ sed -i 's/$/.txt/g'  Jxlist.txt
 sed -i 's/$/.txt/g'  Jylist.txt
 sed -i 's/$/.txt/g'  Jzlist.txt
 
-cp ../xcorr.cpp .
+cp ../xcorr.cpp . 
 
-module load fftw/3.3.7_gcc-5.4.0
-module load gcc/5.4.0   
+module load fftw/3.3.7_gcc-5.4.0 || error_exit "Could not find FFTW3 module"
+module load gcc/5.4.0            || error_exit "Could not find GCC 5.4 module"
 
-g++ xcorr.cpp -lfftw3 -o cor -std=c++11
+g++ xcorr.cpp -lfftw3 -o cor -std=c++11  || error_exit "xcorr.cpp compilation error"
 
 echo "calculating x direction ACF"
-./cor Jxlist.txt ACFx.txt 10000 
+./cor Jxlist.txt ACFx.txt 10000  || error_exit "ACF calculation failed" 
 echo "calculating y direction ACF"
-./cor Jylist.txt ACFy.txt 10000 
+./cor Jylist.txt ACFy.txt 10000  || error_exit "ACF calculation failed" 
 echo "calculating z direction ACF"
-./cor Jzlist.txt ACFz.txt 10000 
+./cor Jzlist.txt ACFz.txt 10000  || error_exit "ACF calculation failed"
 
 rm cor xcorr.cpp 
 
