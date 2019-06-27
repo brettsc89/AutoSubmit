@@ -20,7 +20,7 @@ Brett S Scheiner 6/11/19
 #include <cmath>
 #include <fftw3.h>
 #include<complex.h>
-
+#include <limits>
 
 typedef std::vector<double>doub_v;
 

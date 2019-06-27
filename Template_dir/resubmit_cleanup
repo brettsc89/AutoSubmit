@@ -60,7 +60,7 @@ done
 
 
 echo "Removing previous run directories"
-rm run* -r 
+rm run*/ -r 
 echo "Removing previous run directory lists"
 rm dirlist.txt
 
